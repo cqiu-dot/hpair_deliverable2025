@@ -121,13 +121,13 @@ function App() {
               <button type="submit">Submit</button>
                 
             <\form>
-            <Routes>
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <MultiStepForm />
-                </ProtectedRoute>
-              } />
-            </Routes>
+            // <Routes>
+            //   <Route path="/" element={
+            //     <ProtectedRoute>
+            //       <MultiStepForm />
+            //     </ProtectedRoute>
+            //   } />
+            // </Routes>
           </main>
         </div>
       </Router>
