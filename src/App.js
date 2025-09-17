@@ -120,7 +120,7 @@ function App() {
               <button type="button" onClick={handleReset}>Reset</button>
               <button type="submit">Submit</button>
                 
-            <\form>
+            </form>
             // <Routes>
             //   <Route path="/" element={
             //     <ProtectedRoute>
