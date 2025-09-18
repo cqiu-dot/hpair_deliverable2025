@@ -2,6 +2,16 @@ import React from 'react';
 import { Field, ErrorMessage } from 'formik';
 
 const PersonalInfoStep = () => {
+  const fileInputRef = useRef(null);
+  const { values } = useFormikContext();
+
+  // Clear file input when Formik cv value is reset to null
+  useEffect(() => {
+    if (values.cv === null && fileInputRef.current) {
+      fileInputRef.current.value = null;
+    }
+  }, [values.cv]);
+  
   return (
     <div>
       <h2>Personal Information</h2>
