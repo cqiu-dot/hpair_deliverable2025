@@ -1,32 +1,52 @@
 // Firebase service for form submissions
 import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const COLLECTION_NAME = 'formSubmissions';
+const storage = getStorage();
 
-// Submit form data to Firebase
 export const submitForm = async (formData) => {
   try {
-    const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+    let cvUrl = '';
+
+    // Upload CV file if it exists
+    if (formData.cv) {
+      const cvFile = formData.cv;
+      const storageRef = ref(storage, `cvs/${Date.now()}_${cvFile.name}`);
+
+      // Upload file to Firebase Storage
+      await uploadBytes(storageRef, cvFile);
+
+      // Get downloadable URL
+      cvUrl = await getDownloadURL(storageRef);
+    }
+
+    // Prepare data for Firestore (replace 'cv' field with the URL)
+    const dataToSave = {
       ...formData,
+      cv: cvUrl,
       submittedAt: new Date(),
-      timestamp: Date.now()
-    });
-    
+      timestamp: Date.now(),
+    };
+
+    const docRef = await addDoc(collection(db, 'formSubmissions'), dataToSave);
+
     console.log('Form submitted successfully with ID:', docRef.id);
-    return { 
-      success: true, 
+    return {
+      success: true,
       id: docRef.id,
-      message: 'Form submitted successfully!' 
+      message: 'Form submitted successfully!',
     };
   } catch (error) {
     console.error('Error submitting form:', error);
-    return { 
-      success: false, 
-      message: 'Failed to submit form. Please try again.' 
+    return {
+      success: false,
+      message: 'Failed to submit form. Please try again.',
     };
   }
 };
+
 
 // Get all form submissions (for admin viewing)
 export const getFormSubmissions = async (limitCount = 50) => {
