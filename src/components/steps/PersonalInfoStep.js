@@ -119,16 +119,21 @@ const PersonalInfoStep = () => {
         <ErrorMessage name="subject" component="div" className="error" />
       </div>
 
+
       <div className="form-group">
-        <label htmlFor="cv">PDF Resume (maximum 2MB)</label><Field name="cv">
+        <label htmlFor="cv">PDF Resume (maximum 2MB)</label>
+        <Field name="cv">
           {({ form }) => (
             <input
               type="file"
               id="cv"
               name="cv"
               className="form-input"
+              ref={fileInputRef}
+              accept=".pdf"
               onChange={(event) => {
-                form.setFieldValue('cv', event.currentTarget.files[0]);
+                const file = event.currentTarget.files[0];
+                form.setFieldValue('cv', file || null);
               }}
             />
           )}
