@@ -18,6 +18,8 @@ export const registerUser = async (email, password) => {
     };
   } catch (error) {
     console.error('Registration error:', error);
+    console.log('Error code:', error.code);
+    console.log('Error message:', error.message);
     return { 
       success: false, 
       message: getErrorMessage(error.code) 
