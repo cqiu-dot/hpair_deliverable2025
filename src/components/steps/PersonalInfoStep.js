@@ -1,5 +1,6 @@
-import React from 'react';
-import { Field, ErrorMessage } from 'formik';
+import React, { useRef, useEffect } from 'react';
+import { Field, ErrorMessage, useFormikContext } from 'formik';
+
 
 const PersonalInfoStep = () => {
   const fileInputRef = useRef(null);
