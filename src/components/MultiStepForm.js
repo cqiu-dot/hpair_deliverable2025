@@ -3,16 +3,30 @@ import PersonalInfoStep from './steps/PersonalInfoStep';
 import { submitForm, getFormSubmissions, getSubmissionCount } from '../services/firebaseService';
 import { useAuth } from '../contexts/AuthContext';
 import { signOutUser } from '../services/authService';
-import { Formik, Form, Field, ErrorMessage } from 'formik';
+import { Formik, Form, Field, ErrorMessage, useFormikContext } from 'formik';
 import * as Yup from 'yup';
+import jsPDF from 'jspdf';
 
 const MultiStepForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
+  useEffect(() => {
+    if (submitMessage) {
+      const timer = setTimeout(() => {
+        setSubmitMessage('');
+      }, 5000); // 5 seconds
+
+      return () => clearTimeout(timer); // cleanup
+    }
+  }, [submitMessage]);
   const [submissions, setSubmissions] = useState([]);
   const [submissionCount, setSubmissionCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [savedData, setSavedData] = useState(() => {
+  const saved = localStorage.getItem('formData');
+    return saved ? JSON.parse(saved) : null;
+  });
   const { user, userId } = useAuth();
 
   const handleLogout = async () => {
@@ -55,67 +69,88 @@ const MultiStepForm = () => {
 
   // TODO: Implement form validation using Formik and Yup
   const validationSchema = Yup.object({
-    firstName: Yup.string().required('First name is required'),
-    lastName: Yup.string().required('Last name is required'),
+    fullname: Yup.string().required('Full name is required'),
+    email: Yup.string().email('Invalid email address').required('Email is required'),
     dateOfBirth: Yup.date()
       .max(new Date(), 'Date of birth cannot be in the future')
       .required('Date of birth is required'),
-    gender: Yup.string().oneOf(['Male', 'Female', 'Other'], 'Invalid gender').required('Gender is required'),
+    gender: Yup.string()
+      .oneOf(['Male', 'Female', 'Other', 'Prefer not to say'], 'Invalid gender')
+      .required('Gender is required'),
+    phonenumber: Yup.string().required('Phone number is required'),
+    address: Yup.string().required('Full address is required'),
+    nationality: Yup.string().required('Nationality is required'),
+    cv: Yup.mixed()
+      // .required('CV is required')
+      .nullable() // <-- This allows null values
+      .test('fileSize', 'File too large', value => {
+        if (!value) return true; // no file is okay, pass validation
+        return value && value.size <= 2 * 1024 * 1024; // 2MB limit (optional)
+      })
+      .test('fileType', 'Unsupported file format', value => {
+        if (!value) return true; // no file is okay, pass validation
+        return value && ['application/pdf'].includes(value.type); // Only PDF allowed (optional)
+      }),
   });
 
-{/* <form onSubmit={handleSubmit}>
-              <label htmlFor="fullname">Full Name*</label>
-              <input type="text" placeholder="Your answer" name="fullname"
-              onChange={(e) => handleChanges(e)} required value={values.firstname}/>
-    
-              <label htmlFor="email">Email*</label>
-              <input type="email" placeholder="Your answer" name="email"
-              onChange={(e) => handleChanges(e)} required value={values.email}/>
-    
-              <label htmlFor="phonenumber">Phone Number*</label>
-              <input type="text" placeholder="Your answer" name="phonenumber"
-              onChange={(e) => handleChanges(e)} required value={values.phonenumber}/>
-    
-              <label htmlFor="address">Full Address*</label>
-              <input type="text" placeholder="Your answer" name="address"
-              onChange={(e) => handleChanges(e)} required value={values.address}/>
-    
-              <label htmlFor="nationality">Nationality*</label>
-              <input type="text" placeholder="Your answer" name="nationality"
-              onChange={(e) => handleChanges(e)} required value={values.nationality}/>
-    
-              <label htmlFor="language">Preferred Language</label>
-              <input type="text" placeholder="Your answer" name="language"
-              onChange={(e) => handleChanges(e)} required value={values.language}/>
-
-              <label hmtFor="subject">Interests</label>
-              <select name="subject" id="subject" onChange={(e) => handleChanges(e)}>
-                <option value="aiml">Artificial Intelligence (AIML)</option>
-                <option value="exch">Cultural Exchange (EXCH)</option>
-                <option value="econ">Economics (ECON)</option>
-                <option value="gpol">Global Policy (GPOL)</option>
-                <option value="hlth">Healthcare (HLTH)</option>
-                <option value="acad">Research and Academia (ACAD)</option>
-                <option value="sust">Sustainability (SUST)</option>
-                <option value="tech">Technology (TECH)</option>
-                <option value="othr">Other</option>
-              </select>
-
-              <label htmlFor="cv">CV (one-page)*</label>
-              <input type="file" placeholder="Select File" name="cv"
-              onChange={(e) => handleChanges(e)} required value={values.cv}/>
-    
-              <label htmlFor="linkedin">LinkedIn URL</label>
-              <input type="text" placeholder="Your answer" name="linkedin"
-              onChange={(e) => handleChanges(e)}/>
-
-              <button type="button" onClick={handleReset}>Reset</button>
-              <button type="submit">Submit</button>
-                
-            </form> */}
-
-
   // TODO: Implement form data handling
+
+  const AutoSave = () => {
+    const { values } = useFormikContext();
+
+    useEffect(() => {
+      // Exclude the 'cv' field (file) because it can't be serialized
+      const { cv, ...valuesToSave } = values;
+      localStorage.setItem('formData', JSON.stringify(valuesToSave));
+    }, [values]);
+
+    return null;
+  };
+
+  const initialValues = {
+    firstName: savedData?.firstName || '',
+    lastName: savedData?.lastName || '',
+    fullname: savedData?.fullname || '',
+    email: savedData?.email || '',
+    dateOfBirth: savedData?.dateOfBirth || '',
+    gender: savedData?.gender || '',
+    phonenumber: savedData?.phonenumber || '',
+    address: savedData?.address || '',
+    nationality: savedData?.nationality || '',
+    language: savedData?.language || '',
+    subject: savedData?.subject || '',
+    cv: null,
+    linkedin: savedData?.linkedin || '',
+  };
+
+  const generatePDF = (data) => {
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text("Submission Summary", 20, 20);
+
+    doc.setFontSize(12);
+    let y = 30;
+
+    const addLine = (label, value) => {
+      doc.text(`${label}: ${value || 'N/A'}`, 20, y);
+      y += 10;
+    };
+
+    addLine("Full Name", data.fullname);
+    addLine("Email", data.email);
+    addLine("Date of Birth", data.dateOfBirth);
+    addLine("Gender", data.gender);
+    addLine("Phone Number", data.phonenumber);
+    addLine("Address", data.address);
+    addLine("Nationality", data.nationality);
+    addLine("Preferred Language", data.language);
+    addLine("Main Interest", data.subject);
+    addLine("LinkedIn", data.linkedin);
+
+    // Save the PDF
+    doc.save('submission-summary.pdf');
+  };
 
   return (
     <div className="container">
@@ -141,14 +176,11 @@ const MultiStepForm = () => {
         }}>
           <strong>Logged in as:</strong> {user.email}
         </div>
-        
+
         <Formik
-          initialValues={{
-            firstName: '',
-            lastName: '',
-            dateOfBirth: '',
-            gender: '',
-          }}
+          enableReinitialize
+          initialValues={initialValues}
+
           validationSchema={validationSchema}
           onSubmit={async (values, { setSubmitting, resetForm }) => {
             setIsSubmitting(true);
@@ -164,7 +196,9 @@ const MultiStepForm = () => {
 
               if (result.success) {
                 setSubmitMessage('Form submitted successfully!');
-                resetForm();
+                localStorage.removeItem('formData');   // Clear storage first
+                setSavedData(null);                    // Clear saved data state
+                resetForm();                           // Then reset Formik to the new empty values
                 loadSubmissions();
               } else {
                 setSubmitMessage(result.message);
@@ -179,12 +213,15 @@ const MultiStepForm = () => {
           }}
         >
           {({ values, handleChange, handleBlur }) => (
+
             <Form>
+              <AutoSave />
               <PersonalInfoStep
                 values={values}
                 handleChange={handleChange}
                 handleBlur={handleBlur}
               />
+
 
               {submitMessage && (
                 <div className={`submit-message ${submitMessage.includes('successfully') ? 'success' : 'error'}`}>
@@ -196,6 +233,17 @@ const MultiStepForm = () => {
                 <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                   {isSubmitting ? 'Submitting...' : 'Submit'}
                 </button>
+
+                {!isSubmitting && (
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    style={{ marginTop: '10px', marginLeft: '10px' }}
+                    onClick={() => generatePDF(values)}
+                  >
+                    Download PDF Summary
+                  </button>
+                )}
               </div>
             </Form>
           )}
@@ -242,9 +290,13 @@ const MultiStepForm = () => {
                     </span>
                   </div>
               <div className="submission-details">
-                <p><strong>Name:</strong> {submission.firstName} {submission.lastName}</p>
-                <p><strong>Date of Birth:</strong> {submission.dateOfBirth}</p>
-                <p><strong>Gender:</strong> {submission.gender}</p>
+                <p><strong>Email:</strong> {submission.email}</p>
+                <p><strong>Phone Number:</strong> {submission.phonenumber}</p>
+                <p><strong>Full Address:</strong> {submission.address}</p>
+                <p><strong>Nationality:</strong> {submission.nationality}</p>
+                <p><strong>Preferred Language:</strong> {submission.language}</p>
+                <p><strong>Main Interest:</strong> {submission.subject}</p>
+                <p><strong>LinkedIn:</strong> {submission.linkedin}</p>
               </div>
                 </div>
               ))}
