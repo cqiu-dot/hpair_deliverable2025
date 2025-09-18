@@ -3,9 +3,10 @@ import PersonalInfoStep from './steps/PersonalInfoStep';
 import { submitForm, getFormSubmissions, getSubmissionCount } from '../services/firebaseService';
 import { useAuth } from '../contexts/AuthContext';
 import { signOutUser } from '../services/authService';
+import { Formik, Form, Field, ErrorMessage } from 'formik';
+import * as Yup from 'yup';
 
 const MultiStepForm = () => {
-  const [formData, setFormData] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [submissions, setSubmissions] = useState([]);
@@ -53,38 +54,68 @@ const MultiStepForm = () => {
   };
 
   // TODO: Implement form validation using Formik and Yup
-  // TODO: Implement form data handling
+  const validationSchema = Yup.object({
+    firstName: Yup.string().required('First name is required'),
+    lastName: Yup.string().required('Last name is required'),
+    dateOfBirth: Yup.date()
+      .max(new Date(), 'Date of birth cannot be in the future')
+      .required('Date of birth is required'),
+    gender: Yup.string().oneOf(['Male', 'Female', 'Other'], 'Invalid gender').required('Gender is required'),
+  });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitMessage('');
+{/* <form onSubmit={handleSubmit}>
+              <label htmlFor="fullname">Full Name*</label>
+              <input type="text" placeholder="Your answer" name="fullname"
+              onChange={(e) => handleChanges(e)} required value={values.firstname}/>
     
-    try {
-      // TODO: Add validation before submitting
-      const submissionData = {
-        ...formData,
-        userId: userId
-      };
-      
-      const result = await submitForm(submissionData);
-      
-      if (result.success) {
-        setSubmitMessage('Form submitted successfully!');
-        // Reset form
-        setFormData({});
-        // Reload submissions to show the new one
-        loadSubmissions();
-      } else {
-        setSubmitMessage(result.message);
-      }
-    } catch (error) {
-      setSubmitMessage('An error occurred. Please try again.');
-      console.error('Submit error:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+              <label htmlFor="email">Email*</label>
+              <input type="email" placeholder="Your answer" name="email"
+              onChange={(e) => handleChanges(e)} required value={values.email}/>
+    
+              <label htmlFor="phonenumber">Phone Number*</label>
+              <input type="text" placeholder="Your answer" name="phonenumber"
+              onChange={(e) => handleChanges(e)} required value={values.phonenumber}/>
+    
+              <label htmlFor="address">Full Address*</label>
+              <input type="text" placeholder="Your answer" name="address"
+              onChange={(e) => handleChanges(e)} required value={values.address}/>
+    
+              <label htmlFor="nationality">Nationality*</label>
+              <input type="text" placeholder="Your answer" name="nationality"
+              onChange={(e) => handleChanges(e)} required value={values.nationality}/>
+    
+              <label htmlFor="language">Preferred Language</label>
+              <input type="text" placeholder="Your answer" name="language"
+              onChange={(e) => handleChanges(e)} required value={values.language}/>
+
+              <label hmtFor="subject">Interests</label>
+              <select name="subject" id="subject" onChange={(e) => handleChanges(e)}>
+                <option value="aiml">Artificial Intelligence (AIML)</option>
+                <option value="exch">Cultural Exchange (EXCH)</option>
+                <option value="econ">Economics (ECON)</option>
+                <option value="gpol">Global Policy (GPOL)</option>
+                <option value="hlth">Healthcare (HLTH)</option>
+                <option value="acad">Research and Academia (ACAD)</option>
+                <option value="sust">Sustainability (SUST)</option>
+                <option value="tech">Technology (TECH)</option>
+                <option value="othr">Other</option>
+              </select>
+
+              <label htmlFor="cv">CV (one-page)*</label>
+              <input type="file" placeholder="Select File" name="cv"
+              onChange={(e) => handleChanges(e)} required value={values.cv}/>
+    
+              <label htmlFor="linkedin">LinkedIn URL</label>
+              <input type="text" placeholder="Your answer" name="linkedin"
+              onChange={(e) => handleChanges(e)}/>
+
+              <button type="button" onClick={handleReset}>Reset</button>
+              <button type="submit">Submit</button>
+                
+            </form> */}
+
+
+  // TODO: Implement form data handling
 
   return (
     <div className="container">
@@ -111,28 +142,65 @@ const MultiStepForm = () => {
           <strong>Logged in as:</strong> {user.email}
         </div>
         
-        <form onSubmit={handleSubmit}>
-          <PersonalInfoStep 
-            formData={formData} 
-            setFormData={setFormData} 
-          />
-          
-          {submitMessage && (
-            <div className={`submit-message ${submitMessage.includes('successfully') ? 'success' : 'error'}`}>
-              {submitMessage}
-            </div>
+        <Formik
+          initialValues={{
+            firstName: '',
+            lastName: '',
+            dateOfBirth: '',
+            gender: '',
+          }}
+          validationSchema={validationSchema}
+          onSubmit={async (values, { setSubmitting, resetForm }) => {
+            setIsSubmitting(true);
+            setSubmitMessage('');
+
+            try {
+              const submissionData = {
+                ...values,
+                userId: userId
+              };
+
+              const result = await submitForm(submissionData);
+
+              if (result.success) {
+                setSubmitMessage('Form submitted successfully!');
+                resetForm();
+                loadSubmissions();
+              } else {
+                setSubmitMessage(result.message);
+              }
+            } catch (error) {
+              setSubmitMessage('An error occurred. Please try again.');
+              console.error('Submit error:', error);
+            } finally {
+              setIsSubmitting(false);
+              setSubmitting(false);
+            }
+          }}
+        >
+          {({ values, handleChange, handleBlur }) => (
+            <Form>
+              <PersonalInfoStep
+                values={values}
+                handleChange={handleChange}
+                handleBlur={handleBlur}
+              />
+
+              {submitMessage && (
+                <div className={`submit-message ${submitMessage.includes('successfully') ? 'success' : 'error'}`}>
+                  {submitMessage}
+                </div>
+              )}
+
+              <div className="form-actions">
+                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
+            </Form>
           )}
-          
-          <div className="form-actions">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit'}
-            </button>
-          </div>
-        </form>
+        </Formik>
+
 
         {/* Admin Panel - User's Submissions */}
         <div style={{ marginTop: '40px', paddingTop: '40px', borderTop: '2px solid #e0e0e0' }}>
